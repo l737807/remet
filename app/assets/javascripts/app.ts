@@ -2,29 +2,26 @@
 /// <reference path="libs/jquery/jquery.d.ts"/>
 /// <reference path="libs/jqueryui/jqueryui.d.ts"/>
 /// <reference path="libs/jqueryui/dragslider.d.ts"/>
+/// <reference path="libs/jqueryjson/jqueryjson.d.ts"/>
 /// <reference path="libs/d3/d3gauge.d.ts"/>
 /// <reference path="libs/sammyjs/sammyjs.d.ts"/>
-/// <reference path="libs/jqueryjson/jqueryjson.d.ts"/>
 declare var Flotr;
 declare var MozWebSocket;
 
-class Color
-{
+class Color {
     r: number;
     g: number;
     b: number;
     a: number = 1;
 
-    constructor(r: number, g: number, b: number, a: number = 1)
-    {
+    constructor(r: number, g: number, b: number, a: number = 1) {
         this.r = r;
         this.g = g;
         this.b = b;
         this.a = a;
     }
 
-    rgb(): number[]
-    {
+    rgb(): number[] {
         return [this.r, this.g, this.b];
     }
 }
@@ -60,13 +57,13 @@ class GaugeVM implements StatisticView {
         this.container = document.getElementById(this.id);
 
         var config: any =
-        {
-            size: 250,
-            label: "",
-            min: 0,
-            max: 100,
-            minorTicks: 5
-        }
+            {
+                size: 250,
+                label: "",
+                min: 0,
+                max: 100,
+                minorTicks: 5
+            }
 
         this.gauge = new Gauge(this.id, config);
         this.gauge.render();
@@ -80,7 +77,7 @@ class GaugeVM implements StatisticView {
         this.gauge.redraw(val, 2000);
     }
 
-    setViewDuration(duration: ViewDuration){
+    setViewDuration(duration: ViewDuration) {
 
     }
 
@@ -97,27 +94,27 @@ class GaugeVM implements StatisticView {
     }
 }
 
-
 class Series {
     //This is really an array of elements of [timestamp, data value]
     data: number[][] = [];
     label: string = "";
-    points: any = { show: true};
-    lines: any = {show: true};
+    points: any = { show: true };
+    lines: any = { show: true };
     color: string = "black";
-    
+
     constructor(label: string, color: string) {
         this.color = color;
         this.label = label;
     }
 }
+
 class GraphVM implements StatisticView {
     id: string;
     name: string;
     started: boolean = false;
     container: HTMLElement = null;
     data: Series[] = [];
-    dataStreams: { [key: string]: number} = {};
+    dataStreams: { [key: string]: number } = {};
     graph = null;
     stop: boolean = false;
     paused: boolean = false;
@@ -194,14 +191,14 @@ class GraphVM implements StatisticView {
 
             if (this.paused) {
                 // Animate
-                setTimeout(function () {
+                setTimeout(function() {
                     animate();
                 }, tickTime);
                 return;
             }
 
             //set min and max
-            var graphMin =  1000000000;
+            var graphMin = 1000000000;
             var graphMax = -1000000000;
 
             var now = new Date().getTime();
@@ -216,7 +213,7 @@ class GraphVM implements StatisticView {
                 //find the indexes in the window
                 var lower = this.data[series].data.length;
                 var upper = 0;
-                for (var iter = this.data[series].data.length - 1; iter >=0; iter--) {
+                for (var iter = this.data[series].data.length - 1; iter >= 0; iter--) {
                     var timestamp = this.data[series].data[iter][0];
                     if (timestamp >= graphStart && timestamp <= graphEnd) {
                         if (iter < lower) {
@@ -259,15 +256,15 @@ class GraphVM implements StatisticView {
 
             // Draw Graph
             this.graph = Flotr.draw(this.container, this.data, {
-                yaxis : {
-                    max : graphMax,
-                    min : graphMin
+                yaxis: {
+                    max: graphMax,
+                    min: graphMin
                 },
                 xaxis: {
-                    mode : 'time',
-                    noTicks : 3,
-                    min : graphStart,
-                    max : graphEnd,
+                    mode: 'time',
+                    noTicks: 3,
+                    min: graphStart,
+                    max: graphEnd,
                     timeMode: "local"
 
                 },
@@ -283,7 +280,7 @@ class GraphVM implements StatisticView {
             });
 
             // Animate
-            setTimeout(function () {
+            setTimeout(function() {
                 animate();
             }, tickTime);
         }
@@ -316,19 +313,20 @@ class StatisticNodeVM implements BrowseNode {
         this.statisticName = ko.observable(statisticName);
         this.id = ko.observable(id);
         this.parent = parent;
-        this.children = ko.observableArray();
+        this.children = ko.observableArray<BrowseNode>();
         this.expanded = ko.observable(false);
         this.name = this.statisticName;
-        
-        this.expandMe = () => { this.parent.addGraph(this.id(), this.metricName() + " (" + this.statisticName() + ")"); }
-        this.display = ko.computed<string>(() => { return this.statisticName();});
-    } 
-    
+
+        this.expandMe = () => { console.log(this.id()); this.parent.addGraph(this.id(), this.metricName() + " (" + this.statisticName() + ")"); }
+        this.display = ko.computed<string>(() => { return this.statisticName(); });
+    }
+
     expandMe: () => void;
 }
 
 class MetricNodeVM implements BrowseNode {
     name: KnockoutObservable<string>;
+    shortName: KnockoutObservable<string>;
     children: KnockoutObservableArray<StatisticNodeVM>;
     id: KnockoutObservable<string>;
     expanded: KnockoutObservable<boolean>;
@@ -337,11 +335,11 @@ class MetricNodeVM implements BrowseNode {
 
     constructor(name: string, id: string, parent: AppViewModel) {
         this.name = ko.observable(name);
-        this.children = ko.observableArray();
+        this.children = ko.observableArray<StatisticNodeVM>();
         this.id = ko.observable(id);
         this.expanded = ko.observable(false);
         this.parent = parent;
-        this.display = ko.computed<string>(() => { return this.name();});
+        this.display = ko.computed<string>(() => { return this.name(); });
     }
 
     expandMe() {
@@ -359,11 +357,31 @@ class ServiceNodeVM implements BrowseNode {
 
     constructor(name: string, id: string, parent: AppViewModel) {
         this.name = ko.observable(name);
-        this.children = ko.observableArray();
+        this.children = ko.observableArray<MetricNodeVM>();
         this.id = ko.observable(id);
         this.expanded = ko.observable(false);
         this.parent = parent;
-        this.display = ko.computed<string>(() => { return this.name();});
+        this.display = ko.computed<string>(() => { return this.name(); });
+    }
+
+    expandMe() {
+        this.expanded(this.expanded() == false);
+    }
+}
+
+class FolderNodeVM {
+    name: KnockoutObservable<string>;
+    subFolders: KnockoutObservableArray<FolderNodeVM>;
+    children: KnockoutObservableArray<ServiceNodeVM>;
+    isFolder: boolean;
+    expanded: KnockoutObservable<boolean>;
+
+    constructor(name: string, isFolder: boolean) {
+        this.name = ko.observable(name);
+        this.isFolder = isFolder;
+        this.subFolders = ko.observableArray<FolderNodeVM>();
+        this.children = ko.observableArray<any>();
+        this.expanded = ko.observable(false);
     }
 
     expandMe() {
@@ -416,11 +434,10 @@ class ConnectionVM {
     });
 }
 
-class ViewDuration
-{
+class ViewDuration {
     start: number = 570000;
     end: number = 600000;
-    
+
     constructor(start?: number, end?: number) {
         if (start === undefined) {
             this.start = 570000;
@@ -436,38 +453,39 @@ class ViewDuration
     }
 }
 
-class AppViewModel
-{
-    graphs: KnockoutObservableArray<StatisticView> = ko.observableArray();
-    graphsById: {[id: string]:StatisticView} = {};
-    metricsList = ko.observableArray();
+class AppViewModel {
+    graphs: KnockoutObservableArray<StatisticView> = ko.observableArray<StatisticView>();
+    graphsById: { [id: string]: StatisticView } = {};
+    metricsList = ko.observableArray<ServiceNodeVM>();
+    foldersList = ko.observableArray<FolderNodeVM>();
     sockets = ko.observableArray();
-    connections: KnockoutObservableArray<ConnectionVM> = ko.observableArray();
-    connectionIndex: { [id:string] : ConnectionVM;} = {};
+    connections: KnockoutObservableArray<ConnectionVM> = ko.observableArray<ConnectionVM>();
+    connectionIndex: { [id: string]: ConnectionVM; } = {};
     viewDuration: ViewDuration = new ViewDuration();
     paused = ko.observable<boolean>(false);
     metricsVisible = ko.observable<boolean>(true);
     metricsWidth = ko.observable<boolean>(true);
     mode: KnockoutObservable<string> = ko.observable("graph");
-    private colors: Color[] = [new Color(31,120,180), new Color(51,160,44), new Color(227,26,28), new Color(255,127,0),
-        new Color(106,61,154), new Color(166,206,227), new Color(178,223,138), new Color(251,154,153),
-        new Color(253,191,111), new Color(202,178,214), new Color(255,255,153)];
+    private colors: Color[] = [new Color(31, 120, 180), new Color(51, 160, 44), new Color(227, 26, 28), new Color(255, 127, 0),
+        new Color(106, 61, 154), new Color(166, 206, 227), new Color(178, 223, 138), new Color(251, 154, 153),
+        new Color(253, 191, 111), new Color(202, 178, 214), new Color(255, 255, 153)];
     private colorId = 0;
     sliderChanged: (event: Event, ui) => void;
     removeGraph: (vm: StatisticView) => void;
     removeConnection: (ConnectionVM) => void;
     fragment = ko.computed(function() {
         var servers = jQuery.map(this.connections(), function(element) { return element.server });
-        var graphs = jQuery.map(this.graphs(), function(element) {return {id: element.id, name: element.name};});
+        var graphs = jQuery.map(this.graphs(), function(element) { return { id: element.id, name: element.name }; });
         var obj = { connections: servers, graphs: graphs, showMetrics: this.metricsVisible(), mode: this.mode() };
         return "#" + jQuery.toJSON(obj);
-    },this);
+    }, this);
+    searchQuery = ko.observable<String>('');
 
     doShade = ko.computed(function() {
         return this.connections().some(function(element) {
             return element.selected();
         })
-    },this);
+    }, this);
 
     constructor() {
         this.sliderChanged = (event, ui) => {
@@ -494,7 +512,7 @@ class AppViewModel
         this.setMetricsWidth = () => {
             this.metricsWidth(this.metricsVisible());
         }
-        
+
         this.reconnect = (cvm: ConnectionVM) => {
             var server = cvm.server;
             this.doConnect(server, cvm);
@@ -504,7 +522,7 @@ class AppViewModel
     toggleMetricsVisible() {
         this.metricsVisible(!this.metricsVisible());
     }
-    
+
     setMetricsWidth: () => void;
 
     togglePause() {
@@ -514,14 +532,14 @@ class AppViewModel
         }
     }
 
-//    addGraph(id: string, metric: string, statistic: string) {
+    //    addGraph(id: string, metric: string, statistic: string) {
     addGraph(id: string, metric: string) {
         var existing = this.graphsById[id];
         if (existing != undefined) {
             return;
         }
         var graph: StatisticView;
-//        var name: string = metric + " (" + statistic + ")";
+        //        var name: string = metric + " (" + statistic + ")";
         var name: string = metric;
         if (this.mode() == "graph") {
             graph = new GraphVM(id, name);
@@ -545,7 +563,7 @@ class AppViewModel
             this.graphs()[i].setViewDuration(viewDuration);
         }
     }
-    
+
     parseFragment(fragment: string) {
         var obj = jQuery.parseJSON(fragment.substring(1));
         if (obj == null) {
@@ -564,15 +582,15 @@ class AppViewModel
         jQuery.each(servers, function(index, server) {
             self.connectToServer(server);
         });
-        
+
         jQuery.each(graphs, function(index, graph) {
             self.addGraph(graph.id, graph.name);
         });
-        
+
     }
 
 
-    idify(value: string) : string {
+    idify(value: string): string {
         value = value.replace(/ /g, "_").toLowerCase();
         return value.replace(/\//g, "_");
     }
@@ -610,6 +628,27 @@ class AppViewModel
         this.sortCategories(this.metricsList);
     }
 
+    createFolderMetric(service: string, metric: string, metricName: string, statistic: string, currFolder: FolderNodeVM) {
+        var serviceNode: ServiceNodeVM = this.getServiceFolderVMNode(service, currFolder);
+        if (serviceNode === undefined) {
+            serviceNode = new ServiceNodeVM(service, this.idify(service), this);
+            currFolder.children.push(serviceNode);
+        }
+        var metricNode: MetricNodeVM = this.getMetricVMNode(metric, serviceNode);
+        if (metricNode === undefined) {
+            metricNode = new MetricNodeVM(metric, this.idify(metric), this);
+            metricNode.shortName = ko.observable<string>(metricName);
+            metricNode.expanded(true);
+            serviceNode.children.push(metricNode);
+        }
+        var stat: StatisticNodeVM = this.getStatVMNode(service, metric, statistic, metricNode);
+        if (stat === undefined) {
+            stat = new StatisticNodeVM(service, metric, statistic, this.getGraphName(service, metric, statistic), this);
+            metricNode.children.push(stat);
+        }
+        this.sortCategories(currFolder.children);
+    }
+
     loadMetricsList(newMetrics) {
         for (var i = 0; i < newMetrics.metrics.length; i++) {
             var svc = newMetrics.metrics[i];
@@ -621,10 +660,91 @@ class AppViewModel
                 }
             }
         }
+
+        this.loadFolderMetricsList(newMetrics);
     }
 
+    loadFolderMetricsList(newMetrics) {
+        for (var i = 0; i < newMetrics.metrics.length; i++) {
+            var service = newMetrics.metrics[i];
+            var currFolder = new FolderNodeVM(service.name, true);
+            this.foldersList.push(currFolder);
 
-    getServiceVMNode(name: string) : ServiceNodeVM{
+            for (var j = 0; j < service.children.length; j++) {
+                var metric = service.children[j];
+                var metricSplit = metric.name.split("/");
+                if (metricSplit.length > 1) {
+                    this.addMetricFolder(service, metric, metricSplit, currFolder);
+                } else {
+                    for (var k = 0; k < metric.children.length; k++) {
+                        var statistic = metric.children[k];
+                        this.createFolderMetric(service.name, metric.name, metricSplit[0], statistic.name, currFolder);
+                    }
+                }
+            }
+        }
+
+        this.searchQuery.subscribe(function(searchTerm) {
+            this.searchMetrics(searchTerm);
+        }, this);
+    }
+
+    searchMetrics(searchTerm: string) {
+        for (var i = 0; i < this.foldersList().length; i++) {
+            $("#" + this.foldersList()[i].name()).collapse('show');
+            this.searchFolders(searchTerm, this.foldersList()[i]);
+        }
+    }
+
+    searchFolders(searchTerm: string, currFolder: FolderNodeVM) {
+        $("#folder" + currFolder.name()).collapse('show');
+        var regex = new RegExp(".*" + searchTerm + ".*", "i");
+        for (var i = 0; i < currFolder.children().length; i++) {
+            var service = currFolder.children()[i];
+            for (var j = 0; j < service.children().length; j++) {
+                var metric = service.children()[j];
+                console.log(searchTerm + " " + metric.name() + " " + regex.test(metric.name()));
+                if(regex.test(metric.name()) || searchTerm.length <= 0) {
+                    metric.expanded(true);
+                }
+                else {
+                    metric.expanded(false);
+                }
+            }
+        }
+
+        for (var i = 0; i < currFolder.subFolders().length; i++) {
+            var subFolder = currFolder.subFolders()[i];
+            this.searchFolders(searchTerm, subFolder);
+        }
+    }
+
+    addMetricFolder(service: ServiceNodeVM, metric: MetricNodeVM, metricList: string[], currFolder: FolderNodeVM) {
+        var currMetricName = metricList[0];
+        if (currMetricName.length === 0) {
+            currMetricName = "root";
+        }
+
+        if (metricList.length > 1) {
+            var metricFolder = this.getSubFolderVMNode(currMetricName, currFolder);
+            if (metricFolder === undefined) {
+                metricFolder = new FolderNodeVM(currMetricName, true);
+                currFolder.subFolders.push(metricFolder);
+            }
+
+            metricList.shift();
+            this.sortCategories(currFolder.subFolders);
+            this.addMetricFolder(service, metric, metricList, metricFolder);
+        } else {
+            for (var k = 0; k < metric.children.length; k++) {
+                var statistic = metric.children[k];
+                this.createFolderMetric(service.name, metric.name, currMetricName, statistic.name, currFolder);
+            }
+            this.sortCategories(currFolder.children);
+        }
+    }
+
+    getServiceVMNode(name: string): ServiceNodeVM {
         for (var i = 0; i < this.metricsList().length; i++) {
             var svc = this.metricsList()[i];
             if (svc.name() == name) {
@@ -634,7 +754,27 @@ class AppViewModel
         return undefined;
     }
 
-    getMetricVMNode(name: string, svcNode: ServiceNodeVM) : MetricNodeVM {
+    getServiceFolderVMNode(name: string, currFolder: FolderNodeVM): ServiceNodeVM {
+        for (var i = 0; i < currFolder.children().length; i++) {
+            var service = currFolder.children()[i];
+            if (service.name() == name) {
+                return service;
+            }
+        }
+        return undefined;
+    }
+
+    getSubFolderVMNode(name: string, currFolder: FolderNodeVM): FolderNodeVM {
+        for (var i = 0; i < currFolder.subFolders().length; i++) {
+            var folder = currFolder.subFolders()[i];
+            if (folder.name() == name) {
+                return folder;
+            }
+        }
+        return undefined;
+    }
+
+    getMetricVMNode(name: string, svcNode: ServiceNodeVM): MetricNodeVM {
         for (var i = 0; i < svcNode.children().length; i++) {
             var metric = svcNode.children()[i];
             if (metric.name() == name) {
@@ -644,7 +784,7 @@ class AppViewModel
         return undefined;
     }
 
-    getStatVMNode(service: string, metric: string, statistic: string, metricNode: MetricNodeVM) : StatisticNodeVM {
+    getStatVMNode(service: string, metric: string, statistic: string, metricNode: MetricNodeVM): StatisticNodeVM {
         for (var i = 0; i < metricNode.children().length; i++) {
             var stat: StatisticNodeVM = metricNode.children()[i];
             if (stat.serviceName() == service && stat.metricName() == metric && stat.statisticName() == statistic) {
@@ -694,7 +834,7 @@ class AppViewModel
 
 
         var getMetricsList = () => {
-            metricsSocket.send(JSON.stringify({command: "getMetrics"}));
+            metricsSocket.send(JSON.stringify({ command: "getMetrics" }));
         };
 
         var receiveEvent = (event) => {
@@ -731,7 +871,7 @@ class AppViewModel
             }
             cvm.time = doubled;
             cvm.attempt = cvm.attempt + 1;
-            if (cvm.attempt > 10 ) {
+            if (cvm.attempt > 10) {
                 cvm.status("disconnected");
                 return;
             }
@@ -758,7 +898,6 @@ class AppViewModel
             } else {
                 console.log("connection had never completed successfully");
             }
-            console.log(event);
         };
 
         metricsSocket.onopen = opened;
@@ -769,7 +908,7 @@ class AppViewModel
         cvm.socket = metricsSocket;
     }
 
-    getColor() : Color {
+    getColor(): Color {
         var color = this.colors[this.colorId];
         this.colorId++;
         return color;
@@ -784,7 +923,7 @@ class AppViewModel
 
     connectToServer(server: string) {
         //check to make sure the server is not already in the connect list
-        for(var i = 0; i < this.connections().length; i++) {
+        for (var i = 0; i < this.connections().length; i++) {
             var c = this.connections()[i];
             if (c.server == server) {
                 return;
@@ -796,16 +935,16 @@ class AppViewModel
         this.connectionIndex[server] = connectionNode;
         this.doConnect(server, connectionNode);
 
-//        for (var i = 0; i < this.graphs().length; i++) {
-//            var graph: StatisticView = this.graphs()[i];
-//            graph.updateColor(connectionNode);
-//        }
+        //        for (var i = 0; i < this.graphs().length; i++) {
+        //            var graph: StatisticView = this.graphs()[i];
+        //            graph.updateColor(connectionNode);
+        //        }
         this.connections.push(connectionNode);
 
         var heartbeat = (node) => {
             var metricsSocket = node.socket;
             if (metricsSocket.readyState == 1) {
-                metricsSocket.send(JSON.stringify({command: "heartbeat"}));
+                metricsSocket.send(JSON.stringify({ command: "heartbeat" }));
             }
             setTimeout(() => {
                 heartbeat(node);
@@ -837,36 +976,31 @@ ko.bindingHandlers.slide = {
         var shouldShow = ko.utils.unwrapObservable(valueAccessor());
         var bindings = allBindingsAccessor();
         var direction = ko.utils.unwrapObservable(bindings.direction);
-        var duration = ko.utils.unwrapObservable(bindings.duration) || 400;
-        var after = ko.utils.unwrapObservable(bindings.after);
+        var duration = ko.utils.unwrapObservable<number>(bindings.duration) || 400;
+        var after = ko.utils.unwrapObservable<Function>(bindings.after);
 
         var effectOptions = { "direction": direction };
-        
+
         if (shouldShow) {
             after();
             $(element).show("slide", effectOptions, duration);
         } else {
             $(element).hide("slide", effectOptions, duration, after);
         }
-        
-        
+
+
     }
 }
 
 ko.bindingHandlers.stackdrag = {
-        init: function(element, valueAccessor) {
-            var thisLevel = $(element).parent().children();
-            var value = valueAccessor();
-            console.log("value");
-            console.log(value);
-            var valueUnwrapped = ko.utils.unwrapObservable(value);
+    init: function(element, valueAccessor) {
+        var thisLevel = $(element).parent().children();
+        var value = valueAccessor();
+        var valueUnwrapped = ko.utils.unwrapObservable(value);
 
-//            console.log(thisLevel);
-            jQuery.each(thisLevel, function(index, e) { $(e).draggable(valueUnwrapped);});
-            console.log("valueUnwrapped");
-            console.log(valueUnwrapped);
-        }
+        jQuery.each(thisLevel, function(index, e) { $(e).draggable(valueUnwrapped); });
     }
+}
 
 ko.bindingHandlers.legendBlock = {
     init: function(element, valueAccessor) {

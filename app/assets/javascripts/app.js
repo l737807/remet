@@ -1,3 +1,11 @@
+/// <reference path="libs/knockout/knockout.d.ts"/>
+/// <reference path="libs/jquery/jquery.d.ts"/>
+/// <reference path="libs/jqueryui/jqueryui.d.ts"/>
+/// <reference path="libs/jqueryui/dragslider.d.ts"/>
+/// <reference path="libs/jqueryjson/jqueryjson.d.ts"/>
+/// <reference path="libs/d3/d3gauge.d.ts"/>
+/// <reference path="libs/sammyjs/sammyjs.d.ts"/>
+
 var Color = (function () {
     function Color(r, g, b, a) {
         if (typeof a === "undefined") { a = 1; }
@@ -75,6 +83,7 @@ var Series = (function () {
     }
     return Series;
 })();
+
 var GraphVM = (function () {
     function GraphVM(id, name) {
         this.started = false;
@@ -261,6 +270,7 @@ var StatisticNodeVM = (function () {
         this.name = this.statisticName;
 
         this.expandMe = function () {
+            console.log(_this.id());
             _this.parent.addGraph(_this.id(), _this.metricName() + " (" + _this.statisticName() + ")");
         };
         this.display = ko.computed(function () {
@@ -304,6 +314,20 @@ var ServiceNodeVM = (function () {
         this.expanded(this.expanded() == false);
     };
     return ServiceNodeVM;
+})();
+
+var FolderNodeVM = (function () {
+    function FolderNodeVM(name, isFolder) {
+        this.name = ko.observable(name);
+        this.isFolder = isFolder;
+        this.subFolders = ko.observableArray();
+        this.children = ko.observableArray();
+        this.expanded = ko.observable(false);
+    }
+    FolderNodeVM.prototype.expandMe = function () {
+        this.expanded(this.expanded() == false);
+    };
+    return FolderNodeVM;
 })();
 
 var ConnectionVM = (function () {
@@ -372,6 +396,7 @@ var AppViewModel = (function () {
         this.graphs = ko.observableArray();
         this.graphsById = {};
         this.metricsList = ko.observableArray();
+        this.foldersList = ko.observableArray();
         this.sockets = ko.observableArray();
         this.connections = ko.observableArray();
         this.connectionIndex = {};
@@ -381,18 +406,9 @@ var AppViewModel = (function () {
         this.metricsWidth = ko.observable(true);
         this.mode = ko.observable("graph");
         this.colors = [
-            new Color(31, 120, 180),
-            new Color(51, 160, 44),
-            new Color(227, 26, 28),
-            new Color(255, 127, 0),
-            new Color(106, 61, 154),
-            new Color(166, 206, 227),
-            new Color(178, 223, 138),
-            new Color(251, 154, 153),
-            new Color(253, 191, 111),
-            new Color(202, 178, 214),
-            new Color(255, 255, 153)
-        ];
+            new Color(31, 120, 180), new Color(51, 160, 44), new Color(227, 26, 28), new Color(255, 127, 0),
+            new Color(106, 61, 154), new Color(166, 206, 227), new Color(178, 223, 138), new Color(251, 154, 153),
+            new Color(253, 191, 111), new Color(202, 178, 214), new Color(255, 255, 153)];
         this.colorId = 0;
         this.fragment = ko.computed(function () {
             var servers = jQuery.map(this.connections(), function (element) {
@@ -404,6 +420,7 @@ var AppViewModel = (function () {
             var obj = { connections: servers, graphs: graphs, showMetrics: this.metricsVisible(), mode: this.mode() };
             return "#" + jQuery.toJSON(obj);
         }, this);
+        this.searchQuery = ko.observable('');
         this.doShade = ko.computed(function () {
             return this.connections().some(function (element) {
                 return element.selected();
@@ -544,6 +561,27 @@ var AppViewModel = (function () {
         this.sortCategories(this.metricsList);
     };
 
+    AppViewModel.prototype.createFolderMetric = function (service, metric, metricName, statistic, currFolder) {
+        var serviceNode = this.getServiceFolderVMNode(service, currFolder);
+        if (serviceNode === undefined) {
+            serviceNode = new ServiceNodeVM(service, this.idify(service), this);
+            currFolder.children.push(serviceNode);
+        }
+        var metricNode = this.getMetricVMNode(metric, serviceNode);
+        if (metricNode === undefined) {
+            metricNode = new MetricNodeVM(metric, this.idify(metric), this);
+            metricNode.shortName = ko.observable(metricName);
+            metricNode.expanded(true);
+            serviceNode.children.push(metricNode);
+        }
+        var stat = this.getStatVMNode(service, metric, statistic, metricNode);
+        if (stat === undefined) {
+            stat = new StatisticNodeVM(service, metric, statistic, this.getGraphName(service, metric, statistic), this);
+            metricNode.children.push(stat);
+        }
+        this.sortCategories(currFolder.children);
+    };
+
     AppViewModel.prototype.loadMetricsList = function (newMetrics) {
         for (var i = 0; i < newMetrics.metrics.length; i++) {
             var svc = newMetrics.metrics[i];
@@ -555,6 +593,87 @@ var AppViewModel = (function () {
                 }
             }
         }
+
+        this.loadFolderMetricsList(newMetrics);
+    };
+
+    AppViewModel.prototype.loadFolderMetricsList = function (newMetrics) {
+        for (var i = 0; i < newMetrics.metrics.length; i++) {
+            var service = newMetrics.metrics[i];
+            var currFolder = new FolderNodeVM(service.name, true);
+            this.foldersList.push(currFolder);
+
+            for (var j = 0; j < service.children.length; j++) {
+                var metric = service.children[j];
+                var metricSplit = metric.name.split("/");
+                if (metricSplit.length > 1) {
+                    this.addMetricFolder(service, metric, metricSplit, currFolder);
+                } else {
+                    for (var k = 0; k < metric.children.length; k++) {
+                        var statistic = metric.children[k];
+                        this.createFolderMetric(service.name, metric.name, metricSplit[0], statistic.name, currFolder);
+                    }
+                }
+            }
+        }
+
+        this.searchQuery.subscribe(function (searchTerm) {
+            this.searchMetrics(searchTerm);
+        }, this);
+    };
+
+    AppViewModel.prototype.searchMetrics = function (searchTerm) {
+        for (var i = 0; i < this.foldersList().length; i++) {
+            $("#" + this.foldersList()[i].name()).collapse('show');
+            this.searchFolders(searchTerm, this.foldersList()[i]);
+        }
+    };
+
+    AppViewModel.prototype.searchFolders = function (searchTerm, currFolder) {
+        $("#folder" + currFolder.name()).collapse('show');
+        var regex = new RegExp(".*" + searchTerm + ".*", "i");
+        for (var i = 0; i < currFolder.children().length; i++) {
+            var service = currFolder.children()[i];
+            for (var j = 0; j < service.children().length; j++) {
+                var metric = service.children()[j];
+                console.log(searchTerm + " " + metric.name() + " " + regex.test(metric.name()));
+                if (regex.test(metric.name()) || searchTerm.length <= 0) {
+                    metric.expanded(true);
+                } else {
+                    metric.expanded(false);
+                }
+            }
+        }
+
+        for (var i = 0; i < currFolder.subFolders().length; i++) {
+            var subFolder = currFolder.subFolders()[i];
+            this.searchFolders(searchTerm, subFolder);
+        }
+    };
+
+    AppViewModel.prototype.addMetricFolder = function (service, metric, metricList, currFolder) {
+        var currMetricName = metricList[0];
+        if (currMetricName.length === 0) {
+            currMetricName = "root";
+        }
+
+        if (metricList.length > 1) {
+            var metricFolder = this.getSubFolderVMNode(currMetricName, currFolder);
+            if (metricFolder === undefined) {
+                metricFolder = new FolderNodeVM(currMetricName, true);
+                currFolder.subFolders.push(metricFolder);
+            }
+
+            metricList.shift();
+            this.sortCategories(currFolder.subFolders);
+            this.addMetricFolder(service, metric, metricList, metricFolder);
+        } else {
+            for (var k = 0; k < metric.children.length; k++) {
+                var statistic = metric.children[k];
+                this.createFolderMetric(service.name, metric.name, currMetricName, statistic.name, currFolder);
+            }
+            this.sortCategories(currFolder.children);
+        }
     };
 
     AppViewModel.prototype.getServiceVMNode = function (name) {
@@ -562,6 +681,26 @@ var AppViewModel = (function () {
             var svc = this.metricsList()[i];
             if (svc.name() == name) {
                 return svc;
+            }
+        }
+        return undefined;
+    };
+
+    AppViewModel.prototype.getServiceFolderVMNode = function (name, currFolder) {
+        for (var i = 0; i < currFolder.children().length; i++) {
+            var service = currFolder.children()[i];
+            if (service.name() == name) {
+                return service;
+            }
+        }
+        return undefined;
+    };
+
+    AppViewModel.prototype.getSubFolderVMNode = function (name, currFolder) {
+        for (var i = 0; i < currFolder.subFolders().length; i++) {
+            var folder = currFolder.subFolders()[i];
+            if (folder.name() == name) {
+                return folder;
             }
         }
         return undefined;
@@ -635,7 +774,7 @@ var AppViewModel = (function () {
         var opened = function () {
             cvm.status("connected");
             cvm.hasConnected = true;
-            cvm.connectedAt = (new Date()).getTime();
+            cvm.connectedAt = (new Date).getTime();
             getMetricsList();
             console.log("connection established to " + server);
         };
@@ -672,7 +811,7 @@ var AppViewModel = (function () {
         var closed = function (event) {
             cvm.status("disconnected");
             console.log("connection closed to " + server);
-            var now = (new Date()).getTime();
+            var now = (new Date).getTime();
             if (cvm.connectedAt > 0) {
                 console.log("connection had opened at " + cvm.connectedAt + ", duration = " + (now - cvm.connectedAt));
                 console.log("trying to reconnect in 2 seconds");
@@ -684,7 +823,6 @@ var AppViewModel = (function () {
             } else {
                 console.log("connection had never completed successfully");
             }
-            console.log(event);
         };
 
         metricsSocket.onopen = opened;
@@ -774,16 +912,11 @@ ko.bindingHandlers.stackdrag = {
     init: function (element, valueAccessor) {
         var thisLevel = $(element).parent().children();
         var value = valueAccessor();
-        console.log("value");
-        console.log(value);
         var valueUnwrapped = ko.utils.unwrapObservable(value);
 
-        //            console.log(thisLevel);
         jQuery.each(thisLevel, function (index, e) {
             $(e).draggable(valueUnwrapped);
         });
-        console.log("valueUnwrapped");
-        console.log(valueUnwrapped);
     }
 };
 

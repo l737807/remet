@@ -1,5 +1,5 @@
 body {
-
+    height: 100%;
 }
 
 .graph {
@@ -7,11 +7,40 @@ body {
 }
 
 #container {
-    width : 600px;
+    width: 600px;
     height: 384px;
     margin: 8px auto;
 }
 
 .row-fluid .nomargin {
-	margin-left: 0px;
+    margin-left: 0px;
+}
+
+#footer {
+    height: 60px;
+    background-color: #f5f5f5;
+}
+
+.navbar-title {
+    font-weight: bold;
+}
+
+.sidebar {
+    overflow-y: scroll;
+    overflow-x: hidden;
+}
+
+.sidebar-title {
+    position: relative;
+    top: -5px;
+    margin-top: 0px;
+    margin-bottom: 0px;
+}
+
+.sub-item li {
+    background: white;
+}
+
+.sub-folder {
+    margin-left: 10px;
 }

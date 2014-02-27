@@ -5,3 +5,10 @@ target
 tmp
 .history
 dist
+/.target
+.DS_Store
+*.log
+.classpath
+.project
+.settings
+bin/
